@@ -2353,8 +2353,7 @@ const TopBar = ({ isDark, onOpenSettings }: { isDark: boolean; onOpenSettings: (
     }`}>
       <div className="flex items-center gap-2">
         <span className="flex items-center gap-1.5 cursor-default">
-          <span></span>
-          <span className="font-bold">Melkamu OS</span>
+          
         </span>
       </div>
 
