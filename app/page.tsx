@@ -2844,15 +2844,17 @@ const ControlCenter = ({ isOpen, onClose, isDark, toggleDarkMode, brightness, se
 
 
 // --- MAIN OS ENGINE ---
-
 export default function Home() {
   const [brightness, setBrightness] = React.useState(100);
   const [volume, setVolume] = React.useState(50);
 
   const [isLocked, setIsLocked] = React.useState(true);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
-  // ADD THESE FOR FOLDERS
   const [openFolderId, setOpenFolderId] = React.useState<string | null>(null);
+
+  // App Switcher State
+  const [recentApps, setRecentApps] = React.useState<AppItem[]>([]);
+  const [isAppSwitcherOpen, setIsAppSwitcherOpen] = React.useState(false);
 
   const [osSettings, setOsSettings] = React.useState<OSSettings>({
     darkMode: true,
@@ -2892,7 +2894,6 @@ export default function Home() {
   const [isTrashOpen, setIsTrashOpen] = React.useState(false);
   const [isJiggleMode, setIsJiggleMode] = React.useState(false);
 
-  // NEW: Multi-select state
   const [isSelectMode, setIsSelectMode] = React.useState(false);
   const [selectedAppIds, setSelectedAppIds] = React.useState<Set<string>>(new Set());
 
@@ -2908,16 +2909,6 @@ export default function Home() {
   const totalPages = Math.ceil(desktopApps.length / APPS_PER_PAGE) + 1;
   const parallaxX = (currentPage - totalPages / 2) * -12;
 
-  const handlePagerDragEnd = (_e: any, info: any) => {
-    if (isJiggleMode || isSelectMode) return;
-    const swipeThreshold = 50;
-    if (info.offset.x < -swipeThreshold && currentPage < totalPages - 1) {
-      setCurrentPage(prev => prev + 1);
-    } else if (info.offset.x > swipeThreshold && currentPage > 0) {
-      setCurrentPage(prev => prev - 1);
-    }
-  };
-
   const handleEmptySpaceDown = () => {
     if (emptySpaceTimerRef.current) clearTimeout(emptySpaceTimerRef.current);
     emptySpaceTimerRef.current = setTimeout(() => {
@@ -2932,7 +2923,6 @@ export default function Home() {
     }
   };
 
-  // ── NEW: Selection helpers ────────────────────────────────────
   const toggleSelectApp = (appId: string) => {
     setSelectedAppIds(prev => {
       const next = new Set(prev);
@@ -2975,6 +2965,13 @@ export default function Home() {
   const openApp = (app: AppItem) => {
     setActiveApp(app);
     setActiveMenuId(null);
+    setOpenFolderId(null);
+    if (!app.isFolder) {
+      setRecentApps(prev => {
+        const filtered = prev.filter(a => a.id !== app.id);
+        return [app, ...filtered].slice(0, 5);
+      });
+    }
   };
 
   const uninstallApp = (appId: string) => {
@@ -3002,8 +2999,6 @@ export default function Home() {
       notify('Restored', `${appToRestore.name} is back on the desktop`, '♻️');
     }
   };
-
-  const currentAppChunk = desktopApps.slice((currentPage - 1) * APPS_PER_PAGE, currentPage * APPS_PER_PAGE);
 
   const createNewWidget = (widgetType: 'calendar' | 'battery' | 'storage' | 'screentime') => {
     const widgetInfo: Record<string, { name: string; icon: string; color: string }> = {
@@ -3091,16 +3086,8 @@ export default function Home() {
 
       <AnimatePresence>
         {isTrashOpen && (
-          <motion.div
-            initial={{ opacity: 0, backdropFilter: "blur(0px)" }} animate={{ opacity: 1, backdropFilter: "blur(8px)" }} exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            className="absolute inset-0 z-[105] flex items-center justify-center p-4 bg-black/40"
-            onClick={() => setIsTrashOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className={`w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border flex flex-col max-h-[70vh] ${isDark ? 'bg-slate-800/95 border-slate-700' : 'bg-white/95 border-gray-200'}`}
-            >
+          <motion.div initial={{ opacity: 0, backdropFilter: "blur(0px)" }} animate={{ opacity: 1, backdropFilter: "blur(8px)" }} exit={{ opacity: 0, backdropFilter: "blur(0px)" }} className="absolute inset-0 z-[105] flex items-center justify-center p-4 bg-black/40" onClick={() => setIsTrashOpen(false)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border flex flex-col max-h-[70vh] ${isDark ? 'bg-slate-800/95 border-slate-700' : 'bg-white/95 border-gray-200'}`}>
               <div className={`px-6 py-4 border-b flex justify-between items-center ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
                 <h3 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}><span>🗑️</span> Trash Bin</h3>
                 <button onClick={() => setIsTrashOpen(false)} className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}>✕</button>
@@ -3113,17 +3100,13 @@ export default function Home() {
                     {trashApps.map(app => (
                       <div key={app.id} className={`flex items-center justify-between p-3 rounded-2xl border transition-colors ${isDark ? 'bg-slate-900/50 border-slate-700 hover:border-slate-600' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}>
                         <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm ${app.isWidget ? 'bg-white text-black' : app.color}`}>
-                            {app.icon}
-                          </div>
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm ${app.isWidget ? 'bg-white text-black' : app.color}`}>{app.icon}</div>
                           <div>
                             <span className={`font-bold text-sm block ${isDark ? 'text-white' : 'text-gray-900'}`}>{app.name}</span>
                             <span className={`text-[10px] opacity-60 font-mono uppercase tracking-wider ${isDark ? 'text-white' : 'text-gray-900'}`}>{app.isWidget ? 'Widget' : 'App'}</span>
                           </div>
                         </div>
-                        <button onClick={() => restoreSingleApp(app.id)} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-transform active:scale-95 shadow-sm">
-                          Restore
-                        </button>
+                        <button onClick={() => restoreSingleApp(app.id)} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-transform active:scale-95 shadow-sm">Restore</button>
                       </div>
                     ))}
                   </div>
@@ -3133,98 +3116,45 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
-
+      
       <AnimatePresence>
         {isSearchOpen && (
-          <motion.div
-            initial={{ opacity: 0, backdropFilter: "blur(0px)" }} animate={{ opacity: 1, backdropFilter: "blur(8px)" }} exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            className="absolute inset-0 z-[100] flex items-start justify-center pt-24 px-4 bg-black/40"
-            onClick={() => setIsSearchOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: -20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.95, y: -10, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className={`w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border ${isDark ? 'bg-slate-800/90 border-slate-700' : 'bg-white/95 border-gray-200'}`}
-            >
-              <div className={`flex items-center px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
-                <span className="text-2xl mr-3 opacity-50">🔍</span>
-                <input
-                  autoFocus type="text" placeholder="Search apps, projects, or skills..."
-                  value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 bg-transparent border-none outline-none text-lg placeholder-opacity-50 text-current"
-                />
-                <button onClick={() => setIsSearchOpen(false)} className={`text-xs px-2 py-1 rounded transition ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}>ESC</button>
-              </div>
-
-              <div className="max-h-[60vh] overflow-y-auto p-2">
-                {desktopApps.filter(app => app.name.toLowerCase().includes(searchQuery.toLowerCase())).map((app) => (
-                  <button
-                    key={app.id}
-                    onClick={() => { openApp(app); setIsSearchOpen(false); setSearchQuery(''); }}
-                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-colors ${isDark ? 'hover:bg-slate-700/50 text-white' : 'hover:bg-gray-100 text-gray-900'}`}
-                  >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-sm ${app.color}`}>{app.icon}</div>
-                    <span className="font-medium text-lg">{app.name}</span>
-                    <span className="ml-auto opacity-40 text-sm">Open ⏎</span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
+           <motion.div initial={{ opacity: 0, backdropFilter: "blur(0px)" }} animate={{ opacity: 1, backdropFilter: "blur(8px)" }} exit={{ opacity: 0, backdropFilter: "blur(0px)" }} className="absolute inset-0 z-[100] flex items-start justify-center pt-24 px-4 bg-black/40" onClick={() => setIsSearchOpen(false)}>
+             <motion.div initial={{ scale: 0.95, y: -20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.95, y: -10, opacity: 0 }} onClick={(e) => e.stopPropagation()} className={`w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border ${isDark ? 'bg-slate-800/90 border-slate-700' : 'bg-white/95 border-gray-200'}`}>
+               <div className={`flex items-center px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+                 <span className="text-2xl mr-3 opacity-50">🔍</span>
+                 <input autoFocus type="text" placeholder="Search apps, projects, or skills..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="flex-1 bg-transparent border-none outline-none text-lg placeholder-opacity-50 text-current" />
+                 <button onClick={() => setIsSearchOpen(false)} className={`text-xs px-2 py-1 rounded transition ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}>ESC</button>
+               </div>
+               <div className="max-h-[60vh] overflow-y-auto p-2">
+                 {desktopApps.filter(app => app.name.toLowerCase().includes(searchQuery.toLowerCase())).map((app) => (
+                   <button key={app.id} onClick={() => { openApp(app); setIsSearchOpen(false); setSearchQuery(''); }} className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-colors ${isDark ? 'hover:bg-slate-700/50 text-white' : 'hover:bg-gray-100 text-gray-900'}`}>
+                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-sm ${app.color}`}>{app.icon}</div>
+                     <span className="font-medium text-lg">{app.name}</span>
+                   </button>
+                 ))}
+               </div>
+             </motion.div>
+           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {isWidgetPromptOpen && (
-          <motion.div
-            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            animate={{ opacity: 1, backdropFilter: "blur(8px)" }}
-            exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            className="absolute inset-0 z-[110] flex items-center justify-center p-4 bg-black/50"
-            onClick={() => setIsWidgetPromptOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className={`w-full max-w-md rounded-3xl shadow-2xl border p-6 ${isDark ? 'bg-slate-800/95 border-slate-700 text-white' : 'bg-white/95 border-gray-200 text-gray-900'}`}
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center text-2xl shadow-md">✨</div>
-                <div>
-                  <h3 className="text-lg font-bold">Create New Widget</h3>
-                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Choose a widget to add to your home screen</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <button onClick={() => createNewWidget('calendar')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}>
-                  <div className="text-3xl mb-2">📅</div>
-                  <div className="text-sm font-bold">Calendar</div>
-                  <div className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Date & day widget</div>
-                </button>
-                <button onClick={() => createNewWidget('battery')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}>
-                  <div className="text-3xl mb-2">🔋</div>
-                  <div className="text-sm font-bold">Battery</div>
-                  <div className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Power status</div>
-                </button>
-                <button onClick={() => createNewWidget('storage')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}>
-                  <div className="text-3xl mb-2">💾</div>
-                  <div className="text-sm font-bold">Storage</div>
-                  <div className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Disk usage</div>
-                </button>
-                <button onClick={() => createNewWidget('screentime')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}>
-                  <div className="text-3xl mb-2">⏳</div>
-                  <div className="text-sm font-bold">Screen Time</div>
-                  <div className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Usage tracker</div>
-                </button>
-              </div>
-
-              <button onClick={() => setIsWidgetPromptOpen(false)} className={`w-full py-3 rounded-xl font-bold text-sm transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
-                Cancel
-              </button>
-            </motion.div>
+          <motion.div initial={{ opacity: 0, backdropFilter: "blur(0px)" }} animate={{ opacity: 1, backdropFilter: "blur(8px)" }} exit={{ opacity: 0, backdropFilter: "blur(0px)" }} className="absolute inset-0 z-[110] flex items-center justify-center p-4 bg-black/50" onClick={() => setIsWidgetPromptOpen(false)}>
+             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} onClick={(e) => e.stopPropagation()} className={`w-full max-w-md rounded-3xl shadow-2xl border p-6 ${isDark ? 'bg-slate-800/95 border-slate-700 text-white' : 'bg-white/95 border-gray-200 text-gray-900'}`}>
+               <div className="flex items-center gap-3 mb-4">
+                 <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center text-2xl shadow-md">✨</div>
+                 <div><h3 className="text-lg font-bold">Create New Widget</h3><p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Choose a widget to add to your home screen</p></div>
+               </div>
+               <div className="grid grid-cols-2 gap-3 mb-4">
+                 <button onClick={() => createNewWidget('calendar')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}><div className="text-3xl mb-2">📅</div><div className="text-sm font-bold">Calendar</div></button>
+                 <button onClick={() => createNewWidget('battery')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}><div className="text-3xl mb-2">🔋</div><div className="text-sm font-bold">Battery</div></button>
+                 <button onClick={() => createNewWidget('storage')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}><div className="text-3xl mb-2">💾</div><div className="text-sm font-bold">Storage</div></button>
+                 <button onClick={() => createNewWidget('screentime')} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] active:scale-95 ${isDark ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}><div className="text-3xl mb-2">⏳</div><div className="text-sm font-bold">Screen Time</div></button>
+               </div>
+               <button onClick={() => setIsWidgetPromptOpen(false)} className={`w-full py-3 rounded-xl font-bold text-sm transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>Cancel</button>
+             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -3236,248 +3166,119 @@ export default function Home() {
             className="flex-1 flex flex-col z-10 h-full relative overflow-hidden"
             onClick={() => activeMenuId && setActiveMenuId(null)}
           >
-            {/* Selection mode header bar */}
             {isSelectMode && (
               <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className={`mx-4 mt-2 mb-2 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg border backdrop-blur-xl shrink-0 ${
-                  isDark ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-white/80 border-gray-200 text-gray-900'
-                }`}
+                initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                className={`mx-4 mt-2 mb-2 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg border backdrop-blur-xl shrink-0 ${isDark ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-white/80 border-gray-200 text-gray-900'}`}
               >
-                <button
-                  onClick={exitSelectMode}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                    isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'
-                  }`}
-                >
-                  Cancel
-                </button>
-                <span className="text-sm font-bold">
-                  {selectedAppIds.size} selected
-                </span>
-
+                <button onClick={exitSelectMode} className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>Cancel</button>
+                <span className="text-sm font-bold">{selectedAppIds.size} selected</span>
                 <div className="flex gap-2">
                   {selectedAppIds.size >= 2 && (
                     <button onClick={createFolderFromSelect} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-500 text-white hover:bg-blue-600">📁 Folder</button>
                   )}
-                  
-                  <button 
-                    onClick={trashSelected} 
-                    disabled={selectedAppIds.size === 0} 
-                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                      selectedAppIds.size === 0 
-                        ? 'opacity-40 cursor-not-allowed' 
-                        : isDark ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
-                    }`}
-                  >
-                    🗑️ Trash
-                  </button>
-                  
-                  <button 
-                    onClick={uninstallSelected} 
-                    disabled={selectedAppIds.size === 0} 
-                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                      selectedAppIds.size === 0 
-                        ? 'opacity-40 cursor-not-allowed' 
-                        : 'bg-red-500 text-white hover:bg-red-600'
-                    }`}
-                  >
-                    Uninstall
-                  </button>
+                  <button onClick={trashSelected} disabled={selectedAppIds.size === 0} className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${selectedAppIds.size === 0 ? 'opacity-40' : isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>🗑️ Trash</button>
+                  <button onClick={uninstallSelected} disabled={selectedAppIds.size === 0} className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${selectedAppIds.size === 0 ? 'opacity-40' : 'bg-red-500 text-white'}`}>Uninstall</button>
                 </div>
               </motion.div>
             )}
 
             {!isSelectMode && (
               <div className="flex justify-center z-10 w-full px-4 py-2 shrink-0">
-                <button
-                  onClick={() => setIsSearchOpen(true)}
-                  className={`group flex items-center gap-2 w-full max-w-[280px] sm:max-w-xs px-4 py-2 rounded-full backdrop-blur-md border shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 ${
-                    isDark
-                      ? 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/60'
-                      : 'bg-white/80 border-gray-300/60 text-gray-600 hover:bg-white shadow-md'
-                  }`}
-                >
+                <button onClick={() => setIsSearchOpen(true)} className={`group flex items-center gap-2 w-full max-w-[280px] sm:max-w-xs px-4 py-2 rounded-full backdrop-blur-md border shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 ${isDark ? 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/60' : 'bg-white/80 border-gray-300/60 text-gray-600 hover:bg-white shadow-md'}`}>
                   <svg className="w-4 h-4 opacity-80 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                   <span className="text-sm font-medium tracking-wide flex-1 text-center pr-6 group-hover:text-current">Search</span>
                 </button>
               </div>
             )}
 
-            <div className="flex-1 w-full relative overflow-y-auto no-scrollbar pb-4">
-              <AnimatePresence mode="wait">
-                {currentPage === 0 ? (
-                  <motion.div
-                    key="widgets"
-                    drag={!isSelectMode ? "x" : false}
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.2}
-                    onDragEnd={handlePagerDragEnd}
-                    initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.2 }}
-                    className="w-full h-full"
-                  >
-                    <WidgetView isDark={isDark} />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key={`page-${currentPage}`}
-                    drag={!isJiggleMode && !isSelectMode ? "x" : false}
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.2}
-                    onDragEnd={handlePagerDragEnd}
-                    initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.2 }}
-                    className={`w-full max-w-[430px] sm:max-w-5xl mx-auto mt-2 px-6 sm:px-10 z-10 relative ${!isJiggleMode && !isSelectMode ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                  >
-                    <Reorder.Group
-                      as="div"
-                      axis="x"
-                      values={currentAppChunk}
-                      onReorder={(newChunk: AppItem[]) => {
-                        if (isSelectMode) return;
-                        const newApps = [...desktopApps];
-                        newApps.splice((currentPage - 1) * APPS_PER_PAGE, newChunk.length, ...newChunk);
-                        setDesktopApps(newApps);
-                      }}
-                      className="flex flex-wrap content-start justify-center gap-6 sm:gap-10 w-full max-w-4xl mx-auto"
-                    >
-                      {currentAppChunk.map((app) => {
-                        const isSelected = selectedAppIds.has(app.id);
-                        return (
-                        <Reorder.Item
-                          as="div"
-                          key={app.id}
-                          value={app}
-                          dragListener={!activeMenuId && !isSelectMode}
-                          style={{ touchAction: "none" }}
-                          className="relative outline-none shrink-0 w-[68px] sm:w-[84px] h-[90px] sm:h-[110px]"
-                        >
-                          <motion.div
-                            onContextMenu={(e) => { e.preventDefault(); setActiveMenuId(app.id); }}
-                            onDoubleClick={(e) => { e.preventDefault(); setActiveMenuId(app.id); }}
-                            onTouchStart={() => { window.longPressTimer = setTimeout(() => setActiveMenuId(app.id), 600); }}
-                            onTouchEnd={() => { if (window.longPressTimer) clearTimeout(window.longPressTimer); }}
-                            onTouchMove={() => { if (window.longPressTimer) clearTimeout(window.longPressTimer); }}
-                            className="w-full h-full flex flex-col items-center group cursor-grab active:cursor-grabbing"
-                          >
-                            <AnimatePresence>
-                              {activeMenuId === app.id && !isSelectMode && (
-                                <motion.div
-                                  initial={{ opacity: 0, scale: 0.85, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85, y: 8 }}
-                                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                  className={`absolute top-[75%] left-1/2 -translate-x-1/2 z-[999] w-44 rounded-2xl shadow-2xl flex flex-col overflow-hidden border backdrop-blur-2xl ${isDark ? 'bg-slate-800/95 border-slate-600' : 'bg-white/95 border-gray-200'}`}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                >
-                                  <button onClick={(e) => { e.stopPropagation(); openApp(app); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-blue-500/20 text-white' : 'border-gray-100 hover:bg-blue-50 text-gray-800'}`}>
-                                    <span className="text-base">📂</span> Open
-                                  </button>
-                                  <button onClick={(e) => { e.stopPropagation(); moveToTrash(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-orange-500/20 text-orange-400' : 'border-gray-100 hover:bg-orange-50 text-orange-600'}`}>
-                                    <span className="text-base">🗑️</span> Delete
-                                  </button>
-                                  <button onClick={(e) => { e.stopPropagation(); enterSelectMode(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-sky-500/20 text-sky-400' : 'border-gray-100 hover:bg-sky-50 text-sky-600'}`}>
-                                    <span className="text-base">☑️</span> Select
-                                  </button>
-                                  <button onClick={(e) => { e.stopPropagation(); uninstallApp(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-600'}`}>
-                                    <span className="text-base">❌</span> Uninstall
-                                  </button>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+            {/* 🚀 THE ULTIMATE CSS SCROLL SNAP FIX 🚀 */}
+            <div 
+              id="scroll-snap-container"
+              className="flex-1 w-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar pb-4"
+              onScroll={(e) => {
+                const target = e.target as HTMLDivElement;
+                const pageWidth = target.clientWidth;
+                const newPage = Math.round(target.scrollLeft / pageWidth);
+                if (newPage !== currentPage) setCurrentPage(newPage);
+              }}
+            >
+              {/* Widget Page */}
+              <div className="w-full flex-shrink-0 snap-center overflow-y-auto">
+                <WidgetView isDark={isDark} />
+              </div>
 
-                            <motion.button
-                              onClick={() => {
-                                if (isSelectMode) {
-                                  toggleSelectApp(app.id);
-                                } else if (app.isFolder) {
-                                  setOpenFolderId(app.id);
-                                } else if (!activeMenuId) {
-                                  openApp(app);
-                                }
-                              }}
-                              whileTap={{ scale: 0.9 }}
-                              whileHover={{ scale: isSelectMode ? 0.95 : 1.08 }}
-                              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                              className="relative flex items-center justify-center w-full pointer-events-auto h-[68px] sm:h-[84px]"
-                            >
-                              {app.isFolder && app.folderApps ? (
-                                <div className={`w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] rounded-[1.2rem] p-2 grid grid-cols-2 gap-1 shadow-sm ${isDark ? 'bg-slate-700/80 border border-slate-600' : 'bg-gray-200/80 border border-gray-300'}`}>
-                                  {app.folderApps.slice(0, 4).map((fa, i) => (
-                                    <div key={i} className="flex items-center justify-center text-xl sm:text-2xl leading-none">
-                                      {fa.icon}
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-[48px] sm:text-[64px] drop-shadow-sm transition-transform leading-none">
-                                  {app.icon}
-                                </span>
-                              )}
+              {/* App Pages */}
+              {Array.from({ length: totalPages - 1 }).map((_, pageIndex) => {
+                const chunkIndex = pageIndex + 1;
+                const chunkApps = desktopApps.slice(pageIndex * APPS_PER_PAGE, (pageIndex + 1) * APPS_PER_PAGE);
+                return (
+                  <div key={chunkIndex} className="w-full flex-shrink-0 snap-center overflow-y-auto">
+                    <div className="w-full max-w-[430px] sm:max-w-5xl mx-auto mt-2 px-6 sm:px-10 pb-10">
+                      <Reorder.Group as="div" axis="x" values={chunkApps} onReorder={(newChunk: AppItem[]) => {
+                          if (isSelectMode) return;
+                          const newApps = [...desktopApps];
+                          newApps.splice(pageIndex * APPS_PER_PAGE, newChunk.length, ...newChunk);
+                          setDesktopApps(newApps);
+                        }} className="flex flex-wrap content-start justify-center gap-6 sm:gap-10 w-full max-w-4xl mx-auto">
+                        {chunkApps.map((app) => {
+                          const isSelected = selectedAppIds.has(app.id);
+                          return (
+                          <Reorder.Item as="div" key={app.id} value={app} dragListener={!activeMenuId && !isSelectMode} style={{ touchAction: "none" }} className="relative outline-none shrink-0 w-[68px] sm:w-[84px] h-[90px] sm:h-[110px]">
+                            <motion.div onContextMenu={(e) => { e.preventDefault(); setActiveMenuId(app.id); }} onTouchStart={() => { window.longPressTimer = setTimeout(() => setActiveMenuId(app.id), 600); }} onTouchEnd={() => { if (window.longPressTimer) clearTimeout(window.longPressTimer); }} onTouchMove={() => { if (window.longPressTimer) clearTimeout(window.longPressTimer); }} className="w-full h-full flex flex-col items-center group cursor-grab active:cursor-grabbing">
                               
                               <AnimatePresence>
-                                {isSelectMode && (
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.5 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.5 }}
-                                    className={`absolute -top-1 -right-1 w-6 h-6 rounded-full border-2 flex items-center justify-center shadow-md ${
-                                      isSelected
-                                        ? 'bg-blue-500 border-white'
-                                        : isDark ? 'bg-slate-700/80 border-slate-500' : 'bg-white/80 border-gray-300'
-                                    }`}
-                                  >
-                                    {isSelected && <span className="text-white text-xs font-bold">✓</span>}
+                                {activeMenuId === app.id && !isSelectMode && (
+                                  <motion.div initial={{ opacity: 0, scale: 0.85, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85, y: 8 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }} className={`absolute top-[75%] left-1/2 -translate-x-1/2 z-[999] w-44 rounded-2xl shadow-2xl flex flex-col overflow-hidden border backdrop-blur-2xl ${isDark ? 'bg-slate-800/95 border-slate-600' : 'bg-white/95 border-gray-200'}`} onPointerDown={(e) => e.stopPropagation()}>
+                                    <button onClick={(e) => { e.stopPropagation(); openApp(app); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-blue-500/20 text-white' : 'border-gray-100 hover:bg-blue-50 text-gray-800'}`}><span className="text-base">📂</span> Open</button>
+                                    <button onClick={(e) => { e.stopPropagation(); moveToTrash(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-orange-500/20 text-orange-400' : 'border-gray-100 hover:bg-orange-50 text-orange-600'}`}><span className="text-base">🗑️</span> Delete</button>
+                                    <button onClick={(e) => { e.stopPropagation(); enterSelectMode(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-sky-500/20 text-sky-400' : 'border-gray-100 hover:bg-sky-50 text-sky-600'}`}><span className="text-base">☑️</span> Select</button>
+                                    <button onClick={(e) => { e.stopPropagation(); uninstallApp(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-600'}`}><span className="text-base">❌</span> Uninstall</button>
                                   </motion.div>
                                 )}
                               </AnimatePresence>
-                            </motion.button>
 
-                            <span className={`text-[11px] mt-1.5 leading-tight font-medium tracking-wide w-full text-center overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none ${
-                              isDark
-                                ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]'
-                                : 'text-gray-900 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]'
-                            }`}>
-                              {app.name}
-                            </span>
-                          </motion.div>
-                        </Reorder.Item>
-                      )})}
-                    </Reorder.Group>
-
-                    {!isSelectMode && (
-                      <div
-                        className="w-full h-24"
-                        onPointerDown={handleEmptySpaceDown}
-                        onPointerUp={handleEmptySpaceUp}
-                        onPointerLeave={handleEmptySpaceUp}
-                        onContextMenu={(e) => { e.preventDefault(); setIsWidgetPromptOpen(true); }}
-                      />
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                              <motion.button onClick={() => { if (isSelectMode) toggleSelectApp(app.id); else if (app.isFolder) setOpenFolderId(app.id); else if (!activeMenuId) openApp(app); }} whileTap={{ scale: 0.9 }} whileHover={{ scale: isSelectMode ? 0.95 : 1.08 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="relative flex items-center justify-center w-full pointer-events-auto h-[68px] sm:h-[84px]">
+                                {app.isFolder && app.folderApps ? (
+                                  <div className={`w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] rounded-[1.2rem] p-2 grid grid-cols-2 gap-1 shadow-sm ${isDark ? 'bg-slate-700/80 border border-slate-600' : 'bg-gray-200/80 border border-gray-300'}`}>
+                                    {app.folderApps.slice(0, 4).map((fa, i) => <div key={i} className="flex items-center justify-center text-xl sm:text-2xl leading-none">{fa.icon}</div>)}
+                                  </div>
+                                ) : (
+                                  <span className="text-[48px] sm:text-[64px] drop-shadow-sm transition-transform leading-none">{app.icon}</span>
+                                )}
+                                <AnimatePresence>
+                                  {isSelectMode && (
+                                    <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} className={`absolute -top-1 -right-1 w-6 h-6 rounded-full border-2 flex items-center justify-center shadow-md ${isSelected ? 'bg-blue-500 border-white' : isDark ? 'bg-slate-700/80 border-slate-500' : 'bg-white/80 border-gray-300'}`}>
+                                      {isSelected && <span className="text-white text-xs font-bold">✓</span>}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </motion.button>
+                              <span className={`text-[11px] mt-1.5 leading-tight font-medium tracking-wide w-full text-center overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]' : 'text-gray-900 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]'}`}>{app.name}</span>
+                            </motion.div>
+                          </Reorder.Item>
+                        )})}
+                      </Reorder.Group>
+                      {!isSelectMode && <div className="w-full h-24" onPointerDown={handleEmptySpaceDown} onPointerUp={handleEmptySpaceUp} onPointerLeave={handleEmptySpaceUp} onContextMenu={(e) => { e.preventDefault(); setIsWidgetPromptOpen(true); }} />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="shrink-0 flex flex-col items-center w-full z-20 pb-4 pt-2">
-              {osSettings.dock && !isSelectMode && (
-                <Dock isDark={isDark} onOpenApp={openApp} apps={desktopApps} />
-              )}
-
+              {osSettings.dock && !isSelectMode && <Dock isDark={isDark} onOpenApp={openApp} apps={desktopApps} />}
               <div className="flex justify-center items-center gap-2.5 mt-2">
                 {Array.from({ length: totalPages }).map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => !isSelectMode && setCurrentPage(idx)}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      currentPage === idx
-                        ? (isDark ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-gray-900 shadow-[0_0_8px_rgba(0,0,0,0.5)]')
-                        : (isDark ? 'bg-white/30 hover:bg-white/50' : 'bg-gray-900/30 hover:bg-gray-900/50')
-                    }`}
-                  />
+                  <button key={idx} onClick={() => {
+                    const container = document.getElementById('scroll-snap-container');
+                    if (container) {
+                      container.scrollTo({ left: idx * container.clientWidth, behavior: 'smooth' });
+                    }
+                  }} className={`w-2 h-2 rounded-full transition-all duration-300 ${currentPage === idx ? (isDark ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-gray-900 shadow-[0_0_8px_rgba(0,0,0,0.5)]') : (isDark ? 'bg-white/30 hover:bg-white/50' : 'bg-gray-900/30 hover:bg-gray-900/50')}`} />
                 ))}
               </div>
             </div>
-
           </motion.div>
         ) : (
           <motion.div
@@ -3488,23 +3289,13 @@ export default function Home() {
             transition={{ duration: animDuration + 0.15, ease: [0.32, 0.72, 0, 1] }}
             className="absolute inset-0 z-50 flex flex-col bg-slate-900 origin-center"
           >
-            <div className="pt-12 pb-4 px-6 flex items-center text-white bg-black/40 backdrop-blur-xl border-b border-white/10">
+            <div className="pt-12 pb-4 px-6 flex items-center text-white bg-black/40 backdrop-blur-xl border-b border-white/10 shrink-0">
               <button onClick={() => setActiveApp(null)} className="text-white hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors text-sm font-medium">← Back</button>
-              <motion.h2
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: animDuration * 0.5 }}
-                className="ml-4 text-xl font-bold flex items-center gap-2"
-              >
+              <motion.h2 initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: animDuration * 0.5 }} className="ml-4 text-xl font-bold flex items-center gap-2">
                 <span>{activeApp.icon}</span> {activeApp.name}
               </motion.h2>
             </div>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: animDuration * 0.4, duration: animDuration }}
-              className={`flex-1 overflow-y-auto ${activeApp.id === 'terminal' ? 'p-2 bg-[#1e1e1e]' : (isDark ? 'bg-slate-900 p-6' : 'bg-gray-50 p-6')}`}
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: animDuration * 0.4, duration: animDuration }} className={`flex-1 overflow-y-auto pb-24 ${activeApp.id === 'terminal' ? 'p-2 bg-[#1e1e1e]' : (isDark ? 'bg-slate-900 p-6' : 'bg-gray-50 p-6')}`}>
                {activeApp.id === 'notes' ? <NotesContent isDark={isDark} /> :
                 activeApp.id === 'calculator' ? <CalculatorContent isDark={isDark} /> :
                 activeApp.id === 'game' ? <GameContent isDark={isDark} /> :
@@ -3525,11 +3316,58 @@ export default function Home() {
                 activeApp.id === 'about' ? <AboutMeContent isDark={isDark} /> :
                 activeApp.id === 'resume' ? <ResumeContent isDark={isDark} /> : null }
             </motion.div>
+
+            {/* iOS-STYLE BOTTOM NAVIGATION BAR */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 px-5 py-2.5 rounded-3xl backdrop-blur-2xl bg-slate-800/80 border border-slate-600/50 shadow-2xl z-[60]">
+              <button onClick={() => setActiveApp(null)} className="text-white hover:text-blue-400 transition-colors text-xl font-bold px-3 py-1 active:scale-90">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <button onClick={() => setActiveApp(null)} className="text-white hover:text-red-400 transition-colors text-xl font-bold px-3 py-1 active:scale-90">
+                <div className="w-5 h-5 rounded-full border-2 border-current" />
+              </button>
+              <button onClick={() => setIsAppSwitcherOpen(true)} className="text-white hover:text-green-400 transition-colors text-xl font-bold px-3 py-1 active:scale-90">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* FOLDER MODAL OVERLAY - Correctly placed inside the main return, after the AnimatePresence */}
+      {/* APP SWITCHER (STACK VIEW) */}
+      <AnimatePresence>
+        {isAppSwitcherOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="absolute inset-0 z-[120] flex flex-col items-center justify-center bg-black/60 backdrop-blur-2xl p-4"
+            onClick={() => setIsAppSwitcherOpen(false)}
+          >
+            <h2 className="text-white text-xl font-bold mb-6 drop-shadow-md">App Switcher</h2>
+            <div className="flex gap-4 overflow-x-auto w-full max-w-4xl px-4 pb-10 no-scrollbar snap-x snap-mandatory">
+              {recentApps.length === 0 ? (
+                <div className="text-white/50 text-sm font-medium w-full text-center py-10">No recent apps</div>
+              ) : (
+                recentApps.map((app) => (
+                  <motion.button
+                    key={app.id}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => { e.stopPropagation(); openApp(app); setIsAppSwitcherOpen(false); }}
+                    className="shrink-0 w-[240px] h-[360px] rounded-[2rem] bg-slate-800/90 border border-white/10 shadow-2xl flex flex-col items-center justify-center gap-4 snap-center"
+                  >
+                    <span className="text-[80px] drop-shadow-lg">{app.icon}</span>
+                    <span className="text-white font-bold text-lg">{app.name}</span>
+                  </motion.button>
+                ))
+              )}
+            </div>
+            <button onClick={() => setIsAppSwitcherOpen(false)} className="mt-4 px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full font-semibold text-sm transition-colors backdrop-blur-md">
+              Close Switcher
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* FOLDER MODAL OVERLAY */}
       <AnimatePresence>
         {openFolderId && (
           <motion.div initial={{ opacity: 0, backdropFilter: 'blur(0px)' }} animate={{ opacity: 1, backdropFilter: 'blur(20px)' }} exit={{ opacity: 0, backdropFilter: 'blur(0px)' }} className="absolute inset-0 z-[150] flex flex-col items-center pt-24 bg-black/40" onClick={() => setOpenFolderId(null)}>
