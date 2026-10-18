@@ -17,6 +17,8 @@ type AppItem = {
   icon: string;
   color: string;
   isWidget?: boolean;
+  isFolder?: boolean;      
+  folderApps?: AppItem[];  
 };
 
 // 1. The apps array
