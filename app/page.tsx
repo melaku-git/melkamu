@@ -40,6 +40,10 @@ const apps: AppItem[] = [
   { id: 'settings', name: 'Settings', icon: '⚙️', color: 'bg-gray-500' },
   { id: 'browser', name: 'Browser', icon: '🌍', color: 'bg-blue-600' },
   { id: 'contact', name: 'Contact', icon: '✉️', color: 'bg-rose-500' },
+    // NEW APPS
+  { id: 'notes', name: 'Notes', icon: '📝', color: 'bg-yellow-400' },
+  { id: 'calculator', name: 'Calculator', icon: '🧮', color: 'bg-gray-700' },
+  { id: 'game', name: '2048', icon: '🎮', color: 'bg-indigo-600' },
 ];
 
 // Wallpaper definitions
@@ -1768,7 +1772,7 @@ const EducationContent = ({ isDark }: { isDark: boolean }) => {
                 <div>
                   <h5 className="font-bold text-base group-hover:text-blue-500 transition-colors">{cert.title}</h5>
                   <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{cert.issuer}</p>
-                </div>
+                </div>about 
               </div>
               <div className={`hidden sm:flex items-center px-3 py-1 rounded-full text-xs font-bold border ${isDark ? 'bg-slate-900 border-slate-600 text-slate-300' : 'bg-gray-100 border-gray-200 text-gray-600'}`}>
                 {cert.date}
@@ -2059,6 +2063,370 @@ const AboutMeContent = ({ isDark }: { isDark: boolean }) => {
   );
 };
 
+
+// ─── NOTES APP ────────────────────────────────────────────────────────
+const NotesContent = ({ isDark }: { isDark: boolean }) => {
+  const [notes, setNotes] = React.useState<{ id: string; text: string; date: string }[]>([]);
+  const [input, setInput] = React.useState('');
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('os_notes');
+    if (saved) {
+      try { setNotes(JSON.parse(saved)); } catch (e) {}
+    }
+  }, []);
+
+  const saveNotes = (newNotes: any[]) => {
+    setNotes(newNotes);
+    localStorage.setItem('os_notes', JSON.stringify(newNotes));
+  };
+
+  const addNote = () => {
+    if (!input.trim()) return;
+    const newNote = { id: Date.now().toString(), text: input, date: new Date().toLocaleDateString() };
+    saveNotes([newNote, ...notes]);
+    setInput('');
+  };
+
+  const deleteNote = (id: string) => {
+    saveNotes(notes.filter(n => n.id !== id));
+  };
+
+  return (
+    <div className={`space-y-6 animate-fade-in pb-12 max-w-2xl mx-auto ${isDark ? 'text-white' : 'text-gray-900'}`}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-3xl font-extrabold tracking-tight">Notes</h3>
+        <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-gray-100 border-gray-200 text-gray-500'}`}>
+          {notes.length} {notes.length === 1 ? 'Note' : 'Notes'}
+        </span>
+      </div>
+
+      <div className={`p-4 rounded-3xl border shadow-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Write a new note..."
+          rows={3}
+          className={`w-full bg-transparent outline-none resize-none text-base placeholder-opacity-50 ${isDark ? 'text-white placeholder-slate-500' : 'text-gray-900 placeholder-gray-400'}`}
+        />
+        <div className="flex justify-end mt-2">
+          <button onClick={addNote} className="px-5 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 font-bold rounded-xl transition-transform active:scale-95 shadow-sm">
+            Save Note
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <AnimatePresence>
+          {notes.map((note) => (
+            <motion.div
+              key={note.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={`p-5 rounded-2xl border flex justify-between items-start gap-4 shadow-sm group ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-100'}`}
+            >
+              <div className="flex-1">
+                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{note.text}</p>
+                <span className={`text-[10px] font-bold uppercase tracking-widest mt-3 block ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>{note.date}</span>
+              </div>
+              <button onClick={() => deleteNote(note.id)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-slate-500 hover:text-red-400' : 'hover:bg-red-50 text-gray-400 hover:text-red-500'}`}>
+                🗑️
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        {notes.length === 0 && (
+          <div className={`text-center py-12 text-sm font-medium ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+            No notes yet. Create one above!
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── CALCULATOR APP ───────────────────────────────────────────────────
+const CalculatorContent = ({ isDark }: { isDark: boolean }) => {
+  const [display, setDisplay] = React.useState('0');
+  const [equation, setEquation] = React.useState('');
+  const [isNewNumber, setIsNewNumber] = React.useState(true);
+
+  const handleNum = (num: string) => {
+    if (isNewNumber) {
+      setDisplay(num);
+      setIsNewNumber(false);
+    } else {
+      setDisplay(display === '0' ? num : display + num);
+    }
+  };
+
+  const handleOp = (op: string) => {
+    setEquation(display + ' ' + op + ' ');
+    setIsNewNumber(true);
+  };
+
+  const calculate = () => {
+    try {
+      const fullEquation = equation + display;
+      const result = Function('"use strict";return (' + fullEquation.replace(/×/g, '*').replace(/÷/g, '/') + ')')();
+      setDisplay(String(Number(result.toFixed(6))));
+      setEquation('');
+      setIsNewNumber(true);
+    } catch (e) {
+      setDisplay('Error');
+      setEquation('');
+      setIsNewNumber(true);
+    }
+  };
+
+  const clear = () => {
+    setDisplay('0');
+    setEquation('');
+    setIsNewNumber(true);
+  };
+
+  const buttons = [
+    { label: 'AC', type: 'op', action: clear, color: 'bg-gray-300 text-gray-900' },
+    { label: '±', type: 'op', action: () => setDisplay(String(Number(display) * -1)), color: 'bg-gray-300 text-gray-900' },
+    { label: '%', type: 'op', action: () => setDisplay(String(Number(display) / 100)), color: 'bg-gray-300 text-gray-900' },
+    { label: '÷', type: 'op', action: () => handleOp('÷'), color: 'bg-orange-400 text-white' },
+    
+    { label: '7', type: 'num', action: () => handleNum('7') },
+    { label: '8', type: 'num', action: () => handleNum('8') },
+    { label: '9', type: 'num', action: () => handleNum('9') },
+    { label: '×', type: 'op', action: () => handleOp('×'), color: 'bg-orange-400 text-white' },
+    
+    { label: '4', type: 'num', action: () => handleNum('4') },
+    { label: '5', type: 'num', action: () => handleNum('5') },
+    { label: '6', type: 'num', action: () => handleNum('6') },
+    { label: '-', type: 'op', action: () => handleOp('-'), color: 'bg-orange-400 text-white' },
+    
+    { label: '1', type: 'num', action: () => handleNum('1') },
+    { label: '2', type: 'num', action: () => handleNum('2') },
+    { label: '3', type: 'num', action: () => handleNum('3') },
+    { label: '+', type: 'op', action: () => handleOp('+'), color: 'bg-orange-400 text-white' },
+    
+    { label: '0', type: 'num', action: () => handleNum('0'), span: 'col-span-2' },
+    { label: '.', type: 'num', action: () => { if (!display.includes('.')) handleNum('.'); } },
+    { label: '=', type: 'op', action: calculate, color: 'bg-orange-400 text-white' },
+  ];
+
+  return (
+    <div className={`h-full flex flex-col animate-fade-in max-w-sm mx-auto pb-10 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+      <div className="flex-1 flex flex-col justify-end items-end p-6 pt-12 pb-8 min-h-[200px]">
+        <div className={`text-xl font-medium h-8 opacity-60 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{equation}</div>
+        <div className="text-6xl sm:text-7xl font-light tracking-tighter truncate w-full text-right">{display}</div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3 p-2">
+        {buttons.map((btn, i) => (
+          <button
+            key={i}
+            onClick={btn.action}
+            className={`h-16 sm:h-20 rounded-full text-2xl font-medium flex items-center justify-center transition-transform active:scale-90 ${
+              btn.type === 'num' 
+                ? (isDark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-200 hover:bg-gray-300')
+                : btn.color || 'bg-slate-500'
+            } ${btn.span || ''}`}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── 2048 GAME ────────────────────────────────────────────────────────
+const GameContent = ({ isDark }: { isDark: boolean }) => {
+  const [board, setBoard] = React.useState<number[][]>([
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0]
+  ]);
+  const [score, setScore] = React.useState(0);
+  const [gameOver, setGameOver] = React.useState(false);
+
+  const getTileColor = (val: number) => {
+    const colors: Record<number, string> = {
+      0: isDark ? 'bg-slate-800/50' : 'bg-gray-200',
+      2: 'bg-[#eee4da] text-[#776e65]',
+      4: 'bg-[#ede0c8] text-[#776e65]',
+      8: 'bg-[#f2b179] text-white',
+      16: 'bg-[#f59563] text-white',
+      32: 'bg-[#f67c5f] text-white',
+      64: 'bg-[#f65e3b] text-white',
+      128: 'bg-[#edcf72] text-white',
+      256: 'bg-[#edcc61] text-white',
+      512: 'bg-[#edc850] text-white',
+      1024: 'bg-[#edc53f] text-white',
+      2048: 'bg-[#edc22e] text-white',
+    };
+    return colors[val] || 'bg-[#edc22e] text-white';
+  };
+
+  const initGame = () => {
+    let newBoard = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+    newBoard = addRandomTile(addRandomTile(newBoard));
+    setBoard(newBoard);
+    setScore(0);
+    setGameOver(false);
+  };
+
+  React.useEffect(() => {
+    if (board.flat().every(val => val === 0)) initGame();
+  }, []);
+
+  const addRandomTile = (currentBoard: number[][]) => {
+    const emptyCells = [];
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (currentBoard[r][c] === 0) emptyCells.push({ r, c });
+      }
+    }
+    if (emptyCells.length === 0) return currentBoard;
+    const { r, c } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    const newBoard = currentBoard.map(row => [...row]);
+    newBoard[r][c] = Math.random() < 0.9 ? 2 : 4;
+    return newBoard;
+  };
+
+  const handleKeyDown = React.useCallback((e: KeyboardEvent) => {
+    if (gameOver) return;
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      let newBoard = board.map(row => [...row]);
+      let moved = false;
+      let newScore = score;
+
+      const slide = (row: number[]) => {
+        let arr = row.filter(val => val);
+        let missing = 4 - arr.length;
+        let zeros = Array(missing).fill(0);
+        return zeros.concat(arr);
+      };
+
+      const combine = (row: number[]) => {
+        for (let i = 3; i > 0; i--) {
+          if (row[i] === row[i - 1] && row[i] !== 0) {
+            row[i] *= 2;
+            row[i - 1] = 0;
+            newScore += row[i];
+            moved = true;
+          }
+        }
+        return row;
+      };
+
+      const operate = (row: number[]) => {
+        row = slide(row);
+        row = combine(row);
+        row = slide(row);
+        return row;
+      };
+
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        for (let r = 0; r < 4; r++) {
+          let row = newBoard[r];
+          if (e.key === 'ArrowRight') row.reverse();
+          row = operate(row);
+          if (e.key === 'ArrowRight') row.reverse();
+          if (JSON.stringify(row) !== JSON.stringify(newBoard[r])) moved = true;
+          newBoard[r] = row;
+        }
+      } else {
+        for (let c = 0; c < 4; c++) {
+          let col = [newBoard[0][c], newBoard[1][c], newBoard[2][c], newBoard[3][c]];
+          if (e.key === 'ArrowDown') col.reverse();
+          col = operate(col);
+          if (e.key === 'ArrowDown') col.reverse();
+          for (let r = 0; r < 4; r++) {
+            if (newBoard[r][c] !== col[r]) moved = true;
+            newBoard[r][c] = col[r];
+          }
+        }
+      }
+
+      if (moved) {
+        newBoard = addRandomTile(newBoard);
+        setBoard(newBoard);
+        setScore(newScore);
+        checkGameOver(newBoard);
+      }
+    }
+  }, [board, score, gameOver]);
+
+  React.useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  const checkGameOver = (b: number[][]) => {
+    if (b.flat().includes(0)) return false;
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (c < 3 && b[r][c] === b[r][c + 1]) return false;
+        if (r < 3 && b[r][c] === b[r + 1][c]) return false;
+      }
+    }
+    setGameOver(true);
+  };
+
+  const handleSwipe = (direction: 'up' | 'down' | 'left' | 'right') => {
+    const keyMap = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+    handleKeyDown(new KeyboardEvent('keydown', { key: keyMap[direction] }));
+  };
+
+  return (
+    <div className={`h-full flex flex-col items-center animate-fade-in max-w-sm mx-auto pt-6 pb-12 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+      <div className="flex justify-between items-end w-full mb-6 px-2">
+        <div>
+          <h3 className="text-3xl font-extrabold tracking-tight">2048</h3>
+          <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Join the numbers!</p>
+        </div>
+        <div className={`px-4 py-2 rounded-xl text-center shadow-sm ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-gray-100 border border-gray-200'}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>Score</div>
+          <div className="text-lg font-bold leading-none mt-1">{score}</div>
+        </div>
+      </div>
+
+      <div className={`relative p-3 rounded-2xl shadow-xl w-full max-w-[320px] aspect-square ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-gray-300'}`}>
+        <div className="grid grid-cols-4 grid-rows-4 gap-3 w-full h-full">
+          {board.map((row, r) => (
+            row.map((val, c) => (
+              <div key={`${r}-${c}`} className={`rounded-xl flex items-center justify-center text-2xl sm:text-3xl font-bold transition-all duration-100 ${getTileColor(val)}`}>
+                {val !== 0 ? val : ''}
+              </div>
+            ))
+          ))}
+        </div>
+
+        <AnimatePresence>
+          {gameOver && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center z-10">
+              <h4 className="text-3xl font-bold text-white mb-4">Game Over!</h4>
+              <button onClick={initGame} className="px-6 py-3 bg-white text-black font-bold rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-transform">
+                Try Again
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex gap-4 mt-8">
+        <button onClick={() => handleSwipe('left')} className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800 text-white' : 'bg-white shadow'}`}>←</button>
+        <div className="flex flex-col gap-4">
+          <button onClick={() => handleSwipe('up')} className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800 text-white' : 'bg-white shadow'}`}>↑</button>
+          <button onClick={() => handleSwipe('down')} className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800 text-white' : 'bg-white shadow'}`}>↓</button>
+        </div>
+        <button onClick={() => handleSwipe('right')} className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800 text-white' : 'bg-white shadow'}`}>→</button>
+      </div>
+    </div>
+  );
+};
+
 // WidgetView
 const WidgetView = ({ isDark }: { isDark: boolean }) => {
   const today = new Date();
@@ -2314,37 +2682,14 @@ const NotificationStack = ({ toasts, isDark, onDismiss }: { toasts: Toast[]; isD
 const TopBar = ({ isDark, onOpenSettings }: { isDark: boolean; onOpenSettings: () => void }) => {
   const [time, setTime] = React.useState<string>('');
   const [batteryLevel, setBatteryLevel] = React.useState<number>(100);
-  const [isCharging, setIsCharging] = React.useState<boolean>(false);
   const [isOnline, setIsOnline] = React.useState<boolean>(true);
 
   React.useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTime(now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
-    };
+    const updateTime = () => setTime(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
     updateTime();
-    const clockInterval = setInterval(updateTime, 10000);
-
+    const interval = setInterval(updateTime, 10000);
     setIsOnline(navigator.onLine);
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    if ('getBattery' in navigator) {
-      (navigator as any).getBattery().then((battery: any) => {
-        setBatteryLevel(Math.round(battery.level * 100));
-        setIsCharging(battery.charging);
-        battery.addEventListener('levelchange', () => setBatteryLevel(Math.round(battery.level * 100)));
-        battery.addEventListener('chargingchange', () => setIsCharging(battery.charging));
-      }).catch(() => {});
-    }
-
-    return () => {
-      clearInterval(clockInterval);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -2354,38 +2699,30 @@ const TopBar = ({ isDark, onOpenSettings }: { isDark: boolean; onOpenSettings: (
       <div className="flex items-center gap-2">
         <span className="flex items-center gap-1.5 cursor-default">
           
+        
         </span>
       </div>
 
+      {/* THIS IS THE BUTTON TO OPEN THE CONTROL CENTER */}
       <button
         onClick={onOpenSettings}
         className={`flex items-center gap-3 px-2 py-0.5 rounded-md transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
         title="Open Control Center"
       >
         <div className={`transition-opacity duration-300 ${isOnline ? 'opacity-100' : 'opacity-20 text-red-500'}`}>
-          {isOnline ? (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12.55a11 11 0 0 1 14.08 0" /><path d="M1.42 9a16 16 0 0 1 21.16 0" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><line x1="12" y1="20" x2="12.01" y2="20" />
-            </svg>
-          ) : (
-            <span className="text-[10px] font-bold">Offline</span>
-          )}
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0" /><path d="M1.42 9a16 16 0 0 1 21.16 0" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><line x1="12" y1="20" x2="12.01" y2="20" />
+          </svg>
         </div>
 
         <div className="flex items-center gap-1">
           <span className="text-[10px] opacity-80">{batteryLevel}%</span>
           <div className="flex items-center gap-0.5">
             <div className="w-5 h-2.5 border-current border rounded-sm p-[1px] flex relative overflow-hidden">
-              <div
-                className={`h-full rounded-[1px] transition-all duration-500 ${
-                  batteryLevel <= 20 && !isCharging ? 'bg-red-500' : isCharging ? 'bg-green-500' : 'bg-current'
-                }`}
-                style={{ width: `${batteryLevel}%` }}
-              ></div>
+              <div className="h-full rounded-[1px] bg-current" style={{ width: `${batteryLevel}%` }}></div>
             </div>
             <div className="w-0.5 h-1 bg-current rounded-r-sm opacity-50"></div>
           </div>
-          {isCharging && <span className="text-green-500 text-[10px]">⚡</span>}
         </div>
 
         <span className="min-w-[60px] text-right">{time}</span>
@@ -2514,6 +2851,8 @@ export default function Home() {
 
   const [isLocked, setIsLocked] = React.useState(true);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
+  // ADD THESE FOR FOLDERS
+  const [openFolderId, setOpenFolderId] = React.useState<string | null>(null);
 
   const [osSettings, setOsSettings] = React.useState<OSSettings>({
     darkMode: true,
@@ -2687,6 +3026,29 @@ export default function Home() {
     notify('Widget Created', `${info.name} added to home screen`, '✨');
   };
 
+  const createFolderFromSelect = () => {
+    if (selectedAppIds.size < 2) return;
+    const ids = Array.from(selectedAppIds);
+    const selectedApps = desktopApps.filter(a => ids.includes(a.id));
+    
+    const newFolder: AppItem = {
+      id: `folder-${Date.now()}`,
+      name: 'Folder',
+      icon: '📁',
+      color: 'bg-gray-400',
+      isFolder: true,
+      folderApps: selectedApps
+    };
+
+    setDesktopApps(prev => {
+      const filtered = prev.filter(a => !ids.includes(a.id));
+      return [newFolder, ...filtered];
+    });
+    notify('Folder Created', 'Apps grouped successfully', '📁');
+    setIsSelectMode(false);
+    setSelectedAppIds(new Set());
+  };
+
   if (isLocked) {
     return (
       <div className="min-h-screen flex flex-col relative font-sans overflow-hidden">
@@ -2694,7 +3056,7 @@ export default function Home() {
       </div>
     );
   }
-
+  
   return (
     <div className={`min-h-screen flex flex-col relative font-sans overflow-hidden transition-colors duration-500 ${wallpaper}`}>
 
@@ -2871,7 +3233,7 @@ export default function Home() {
         {!activeApp ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: animDuration }}
-            className="flex-1 flex flex-col pt-10 z-10 h-full relative"
+            className="flex-1 flex flex-col z-10 h-full relative overflow-hidden"
             onClick={() => activeMenuId && setActiveMenuId(null)}
           >
             {/* Selection mode header bar */}
@@ -2880,7 +3242,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className={`mx-4 mb-2 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg border backdrop-blur-xl ${
+                className={`mx-4 mt-2 mb-2 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg border backdrop-blur-xl shrink-0 ${
                   isDark ? 'bg-slate-800/80 border-slate-700 text-white' : 'bg-white/80 border-gray-200 text-gray-900'
                 }`}
               >
@@ -2895,24 +3257,30 @@ export default function Home() {
                 <span className="text-sm font-bold">
                   {selectedAppIds.size} selected
                 </span>
+
                 <div className="flex gap-2">
-                  <button
-                    onClick={trashSelected}
-                    disabled={selectedAppIds.size === 0}
+                  {selectedAppIds.size >= 2 && (
+                    <button onClick={createFolderFromSelect} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-500 text-white hover:bg-blue-600">📁 Folder</button>
+                  )}
+                  
+                  <button 
+                    onClick={trashSelected} 
+                    disabled={selectedAppIds.size === 0} 
                     className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                      selectedAppIds.size === 0
-                        ? 'opacity-40 cursor-not-allowed'
+                      selectedAppIds.size === 0 
+                        ? 'opacity-40 cursor-not-allowed' 
                         : isDark ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
                     }`}
                   >
                     🗑️ Trash
                   </button>
-                  <button
-                    onClick={uninstallSelected}
-                    disabled={selectedAppIds.size === 0}
+                  
+                  <button 
+                    onClick={uninstallSelected} 
+                    disabled={selectedAppIds.size === 0} 
                     className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                      selectedAppIds.size === 0
-                        ? 'opacity-40 cursor-not-allowed'
+                      selectedAppIds.size === 0 
+                        ? 'opacity-40 cursor-not-allowed' 
                         : 'bg-red-500 text-white hover:bg-red-600'
                     }`}
                   >
@@ -2923,7 +3291,7 @@ export default function Home() {
             )}
 
             {!isSelectMode && (
-              <div className="flex justify-center z-10 w-full px-4 mb-2 shrink-0">
+              <div className="flex justify-center z-10 w-full px-4 py-2 shrink-0">
                 <button
                   onClick={() => setIsSearchOpen(true)}
                   className={`group flex items-center gap-2 w-full max-w-[280px] sm:max-w-xs px-4 py-2 rounded-full backdrop-blur-md border shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 ${
@@ -2938,7 +3306,7 @@ export default function Home() {
               </div>
             )}
 
-            <div className="flex-1 w-full relative overflow-hidden pb-2">
+            <div className="flex-1 w-full relative overflow-y-auto no-scrollbar pb-4">
               <AnimatePresence mode="wait">
                 {currentPage === 0 ? (
                   <motion.div
@@ -2960,7 +3328,7 @@ export default function Home() {
                     dragElastic={0.2}
                     onDragEnd={handlePagerDragEnd}
                     initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.2 }}
-                    className={`w-full max-w-[430px] sm:max-w-5xl mx-auto mt-4 px-6 sm:px-10 z-10 relative h-full overflow-y-auto no-scrollbar pb-10 ${!isJiggleMode && !isSelectMode ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                    className={`w-full max-w-[430px] sm:max-w-5xl mx-auto mt-2 px-6 sm:px-10 z-10 relative ${!isJiggleMode && !isSelectMode ? 'cursor-grab active:cursor-grabbing' : ''}`}
                   >
                     <Reorder.Group
                       as="div"
@@ -2993,7 +3361,6 @@ export default function Home() {
                             onTouchMove={() => { if (window.longPressTimer) clearTimeout(window.longPressTimer); }}
                             className="w-full h-full flex flex-col items-center group cursor-grab active:cursor-grabbing"
                           >
-
                             <AnimatePresence>
                               {activeMenuId === app.id && !isSelectMode && (
                                 <motion.div
@@ -3002,28 +3369,16 @@ export default function Home() {
                                   className={`absolute top-[75%] left-1/2 -translate-x-1/2 z-[999] w-44 rounded-2xl shadow-2xl flex flex-col overflow-hidden border backdrop-blur-2xl ${isDark ? 'bg-slate-800/95 border-slate-600' : 'bg-white/95 border-gray-200'}`}
                                   onPointerDown={(e) => e.stopPropagation()}
                                 >
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openApp(app); }}
-                                    className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-blue-500/20 text-white' : 'border-gray-100 hover:bg-blue-50 text-gray-800'}`}
-                                  >
+                                  <button onClick={(e) => { e.stopPropagation(); openApp(app); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-blue-500/20 text-white' : 'border-gray-100 hover:bg-blue-50 text-gray-800'}`}>
                                     <span className="text-base">📂</span> Open
                                   </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); moveToTrash(app.id); }}
-                                    className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-orange-500/20 text-orange-400' : 'border-gray-100 hover:bg-orange-50 text-orange-600'}`}
-                                  >
+                                  <button onClick={(e) => { e.stopPropagation(); moveToTrash(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-orange-500/20 text-orange-400' : 'border-gray-100 hover:bg-orange-50 text-orange-600'}`}>
                                     <span className="text-base">🗑️</span> Delete
                                   </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); enterSelectMode(app.id); }}
-                                    className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-sky-500/20 text-sky-400' : 'border-gray-100 hover:bg-sky-50 text-sky-600'}`}
-                                  >
+                                  <button onClick={(e) => { e.stopPropagation(); enterSelectMode(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-sky-500/20 text-sky-400' : 'border-gray-100 hover:bg-sky-50 text-sky-600'}`}>
                                     <span className="text-base">☑️</span> Select
                                   </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); uninstallApp(app.id); }}
-                                    className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-600'}`}
-                                  >
+                                  <button onClick={(e) => { e.stopPropagation(); uninstallApp(app.id); }} className={`px-4 py-2.5 text-sm font-semibold text-left flex items-center gap-3 transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-50 text-red-600'}`}>
                                     <span className="text-base">❌</span> Uninstall
                                   </button>
                                 </motion.div>
@@ -3034,6 +3389,8 @@ export default function Home() {
                               onClick={() => {
                                 if (isSelectMode) {
                                   toggleSelectApp(app.id);
+                                } else if (app.isFolder) {
+                                  setOpenFolderId(app.id);
                                 } else if (!activeMenuId) {
                                   openApp(app);
                                 }
@@ -3043,8 +3400,20 @@ export default function Home() {
                               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                               className="relative flex items-center justify-center w-full pointer-events-auto h-[68px] sm:h-[84px]"
                             >
-                              <span className="text-[48px] sm:text-[64px] drop-shadow-sm transition-transform leading-none">{app.icon}</span>
-                              {/* Selection indicator */}
+                              {app.isFolder && app.folderApps ? (
+                                <div className={`w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] rounded-[1.2rem] p-2 grid grid-cols-2 gap-1 shadow-sm ${isDark ? 'bg-slate-700/80 border border-slate-600' : 'bg-gray-200/80 border border-gray-300'}`}>
+                                  {app.folderApps.slice(0, 4).map((fa, i) => (
+                                    <div key={i} className="flex items-center justify-center text-xl sm:text-2xl leading-none">
+                                      {fa.icon}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-[48px] sm:text-[64px] drop-shadow-sm transition-transform leading-none">
+                                  {app.icon}
+                                </span>
+                              )}
+                              
                               <AnimatePresence>
                                 {isSelectMode && (
                                   <motion.div
@@ -3089,22 +3458,24 @@ export default function Home() {
               </AnimatePresence>
             </div>
 
-            {osSettings.dock && !isSelectMode && (
-              <Dock isDark={isDark} onOpenApp={openApp} apps={desktopApps} />
-            )}
+            <div className="shrink-0 flex flex-col items-center w-full z-20 pb-4 pt-2">
+              {osSettings.dock && !isSelectMode && (
+                <Dock isDark={isDark} onOpenApp={openApp} apps={desktopApps} />
+              )}
 
-            <div className="flex justify-center items-center gap-2.5 pb-4 shrink-0 z-20">
-              {Array.from({ length: totalPages }).map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => !isSelectMode && setCurrentPage(idx)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    currentPage === idx
-                      ? (isDark ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-gray-900 shadow-[0_0_8px_rgba(0,0,0,0.5)]')
-                      : (isDark ? 'bg-white/30 hover:bg-white/50' : 'bg-gray-900/30 hover:bg-gray-900/50')
-                  }`}
-                />
-              ))}
+              <div className="flex justify-center items-center gap-2.5 mt-2">
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => !isSelectMode && setCurrentPage(idx)}
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                      currentPage === idx
+                        ? (isDark ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-gray-900 shadow-[0_0_8px_rgba(0,0,0,0.5)]')
+                        : (isDark ? 'bg-white/30 hover:bg-white/50' : 'bg-gray-900/30 hover:bg-gray-900/50')
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
 
           </motion.div>
@@ -3134,22 +3505,46 @@ export default function Home() {
               transition={{ delay: animDuration * 0.4, duration: animDuration }}
               className={`flex-1 overflow-y-auto ${activeApp.id === 'terminal' ? 'p-2 bg-[#1e1e1e]' : (isDark ? 'bg-slate-900 p-6' : 'bg-gray-50 p-6')}`}
             >
-               {activeApp.id === 'uiux' ? <UIUXContent /> :
-               activeApp.id === 'experience' ? <ExperienceContent /> :
-               activeApp.id === 'terminal' ? <TerminalContent /> :
-               activeApp.id === 'github' ? <GitHubContent /> :
-               activeApp.id === 'news' ? <TechNewsContent /> :
-               activeApp.id === 'settings' ? <SettingsContent settings={osSettings} setSettings={setOsSettings} notify={notify} /> :
-               activeApp.id === 'browser' ? <BrowserContent isDark={isDark} /> :
-               activeApp.id === 'contact' ? <ContactContent isDark={isDark} /> :
-               activeApp.id === 'architecture' ? <ArchitectureContent isDark={isDark} /> :
-               activeApp.id === 'coursework' ? <CourseworkContent isDark={isDark} /> :
-               activeApp.id === 'education' ? <EducationContent isDark={isDark} /> :
-               activeApp.id === 'mobile' ? <MobileAppsContent isDark={isDark} /> :
-               activeApp.id === 'projects' ? <WebAppsContent isDark={isDark} /> :
-               activeApp.id === 'skills' ? <TechStackContent isDark={isDark} /> :
-               activeApp.id === 'about' ? <AboutMeContent isDark={isDark} /> :
-               activeApp.id === 'resume' ? <ResumeContent isDark={isDark} /> : null }
+               {activeApp.id === 'notes' ? <NotesContent isDark={isDark} /> :
+                activeApp.id === 'calculator' ? <CalculatorContent isDark={isDark} /> :
+                activeApp.id === 'game' ? <GameContent isDark={isDark} /> :
+                activeApp.id === 'uiux' ? <UIUXContent /> :
+                activeApp.id === 'experience' ? <ExperienceContent /> :
+                activeApp.id === 'terminal' ? <TerminalContent /> :
+                activeApp.id === 'github' ? <GitHubContent /> :
+                activeApp.id === 'news' ? <TechNewsContent /> :
+                activeApp.id === 'settings' ? <SettingsContent settings={osSettings} setSettings={setOsSettings} notify={notify} /> :
+                activeApp.id === 'browser' ? <BrowserContent isDark={isDark} /> :
+                activeApp.id === 'contact' ? <ContactContent isDark={isDark} /> :
+                activeApp.id === 'architecture' ? <ArchitectureContent isDark={isDark} /> :
+                activeApp.id === 'coursework' ? <CourseworkContent isDark={isDark} /> :
+                activeApp.id === 'education' ? <EducationContent isDark={isDark} /> :
+                activeApp.id === 'mobile' ? <MobileAppsContent isDark={isDark} /> :
+                activeApp.id === 'projects' ? <WebAppsContent isDark={isDark} /> :
+                activeApp.id === 'skills' ? <TechStackContent isDark={isDark} /> :
+                activeApp.id === 'about' ? <AboutMeContent isDark={isDark} /> :
+                activeApp.id === 'resume' ? <ResumeContent isDark={isDark} /> : null }
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* FOLDER MODAL OVERLAY - Correctly placed inside the main return, after the AnimatePresence */}
+      <AnimatePresence>
+        {openFolderId && (
+          <motion.div initial={{ opacity: 0, backdropFilter: 'blur(0px)' }} animate={{ opacity: 1, backdropFilter: 'blur(20px)' }} exit={{ opacity: 0, backdropFilter: 'blur(0px)' }} className="absolute inset-0 z-[150] flex flex-col items-center pt-24 bg-black/40" onClick={() => setOpenFolderId(null)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()} className="w-full max-w-md px-6">
+              <h2 className="text-white text-2xl font-bold text-center mb-8 drop-shadow-md">
+                {desktopApps.find(a => a.id === openFolderId)?.name}
+              </h2>
+              <div className="grid grid-cols-3 gap-8">
+                {desktopApps.find(a => a.id === openFolderId)?.folderApps?.map(app => (
+                  <button key={app.id} onClick={() => openApp(app)} className="flex flex-col items-center gap-2 group">
+                    <span className="text-[64px] leading-none drop-shadow-lg group-hover:scale-110 transition-transform">{app.icon}</span>
+                    <span className="text-xs text-white drop-shadow-md font-medium">{app.name}</span>
+                  </button>
+                ))}
+              </div>
             </motion.div>
           </motion.div>
         )}
