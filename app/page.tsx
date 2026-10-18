@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import Image from 'next/image';
+
 
 // Extend window type for long press timer
 declare global {
@@ -2010,12 +2012,15 @@ const AboutMeContent = ({ isDark }: { isDark: boolean }) => {
         <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
           <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-gray-100 border-gray-300'}`}>
             {!imageError ? (
-              <img
-                src="/melkamu.jpg"
-                alt="Melkamu Derso"
-                onError={() => setImageError(true)}
-                className="w-full h-full object-cover"
-              />
+              <Image
+  src="/melkamu.jpg"
+  alt="Melkamu Derso"
+  width={112}
+  height={112}
+  className="w-full h-full object-cover"
+  priority
+  onError={() => setImageError(true)}
+/>
             ) : (
               <div className="w-full h-full flex items-center justify-center font-bold text-xl">MD</div>
             )}
