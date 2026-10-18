@@ -12,7 +12,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// 👇 THIS IS THE FIXED METADATA BLOCK 👇
 export const metadata: Metadata = {
   metadataBase: new URL("https://melkamu-derso.vercel.app"),
   title: "Melkamu Derso",
@@ -23,14 +22,24 @@ export const metadata: Metadata = {
     url: "https://melkamu-derso.vercel.app",
     siteName: "Melkamu Derso",
     type: "website",
+    // 👇 This forces a nice, clean image to show up
+    images: [
+      {
+        url: "https://melkamu-derso.vercel.app/melkamu.jpg", 
+        width: 800,
+        height: 600,
+        alt: "Melkamu Derso Portfolio",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Melkamu Derso",
     description: "Full-Stack & Mobile Application Developer",
+    // 👇 This does the same for Twitter
+    images: ["https://melkamu-derso.vercel.app/melkamu.jpg"],
   },
 };
-// 👆 END OF FIXED METADATA 👆
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
